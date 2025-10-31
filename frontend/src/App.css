@@ -1,0 +1,94 @@
+/* Page background */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, black, #f5576c); /* colorful gradient */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Centered card */
+.card {
+  background: white;
+  padding: 40px 30px;
+  border-radius: 15px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  width: 380px;
+  text-align: center;
+}
+
+/* Headings */
+h1, h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* Paragraph text */
+p {
+  margin-bottom: 20px;
+  color: #666;
+}
+
+/* Input fields - stacked vertically */
+input {
+  width: 100%;
+  padding: 14px 12px;
+  margin: 12px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  transition: all 0.3s;
+}
+
+input:focus {
+  border-color: #f5576c;
+  box-shadow: 0 0 5px rgba(245, 87, 108, 0.5);
+  outline: none;
+}
+
+/* Buttons */
+button {
+  width: 100%;
+  padding: 14px;
+  margin: 12px 0;
+  border-radius: 8px;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: white;
+}
+
+button.btn-primary {
+  background: linear-gradient(45deg, #f093fb, #f5576c);
+}
+
+button.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+button.btn-secondary {
+  background: linear-gradient(45deg, #43e97b, #38f9d7);
+}
+
+button.btn-secondary:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+/* Link text */
+.link {
+  color: #f5576c;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 14px;
+}
+
+/* Extra spacing between buttons */
+.btn-spacing {
+  margin-top: 20px; /* increases the space between buttons */
+}
