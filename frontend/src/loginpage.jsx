@@ -24,17 +24,29 @@ function Loginpage() {
 
         if (res.ok) {
             alert(data.message);
-
-            // ✅ Save email for later (for upload page or other pages)
             localStorage.setItem("userEmail", email);
 
-            // ✅ If email is verified → go to tourist place selection page
+           
+            localStorage.setItem(
+                "token",
+                data.token
+            );
+
+            
             if (data.emailVerified) {
-            navigate("/select-place");
+
+                // save login state if needed later
+                localStorage.setItem("token", data.token);
+
+                navigate("/dashboard");
+
             } else {
-            // If not verified → go to email verification page
-            navigate("/verify");
+            
+                navigate("/verify", { state: { email } });
             }
+        } else if (res.status === 403) {
+            alert(data.message || "Email verification required");
+            navigate("/verify", { state: { email } });
         } else {
             alert(data.message || "Login failed");
         }
@@ -46,7 +58,7 @@ function Loginpage() {
 
     return (
         <div className="card">
-        <h2>Login 🔐</h2>
+        <h2>Login </h2>
         <form onSubmit={handleLogin}>
             <input
             type="email"

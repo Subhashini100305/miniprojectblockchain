@@ -5,7 +5,7 @@ function Welcomepage() {
 
     return (
         <div className="card">
-        <h1>Welcome to Review System 🌟</h1>
+        <h1>Welcome to Review System </h1>
         <p>Please choose an option below:</p>
         <button className="btn btn-primary" onClick={() => navigate("/register")}>
             Register

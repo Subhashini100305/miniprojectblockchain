@@ -1,142 +1,80 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import "./App.css";
 
 export default function TouristSelectPage() {
     const navigate = useNavigate();
+
+    const [inputValue, setInputValue] = useState("");
+    const [options, setOptions] = useState([]);
     const [selectedPlace, setSelectedPlace] = useState(null);
 
-    // 🏞️ Full list of major Indian tourist places
-    const touristPlaces = [
-        "Taj Mahal (Agra)",
-        "Jaipur City Palace (Rajasthan)",
-        "Hampi (Karnataka)",
-        "Mysore Palace (Karnataka)",
-        "Gateway of India (Mumbai)",
-        "Meenakshi Temple (Madurai)",
-        "Charminar (Hyderabad)",
-        "Qutub Minar (Delhi)",
-        "Red Fort (Delhi)",
-        "Golden Temple (Amritsar)",
-        "Backwaters (Kerala)",
-        "Rann of Kutch (Gujarat)",
-        "Sundarbans (West Bengal)",
-        "Kedarnath Temple (Uttarakhand)",
-        "Badrinath Temple (Uttarakhand)",
-        "Manali (Himachal Pradesh)",
-        "Shimla (Himachal Pradesh)",
-        "Ladakh (Jammu & Kashmir)",
-        "Dal Lake (Srinagar)",
-        "Darjeeling (West Bengal)",
-        "Ooty (Tamil Nadu)",
-        "Coorg (Karnataka)",
-        "Munnar (Kerala)",
-        "Kodaikanal (Tamil Nadu)",
-        "Andaman Islands",
-        "Rameswaram (Tamil Nadu)",
-        "Ellora Caves (Maharashtra)",
-        "Ajanta Caves (Maharashtra)",
-        "Khajuraho Temples (Madhya Pradesh)",
-        "Konark Sun Temple (Odisha)",
-        "Chikmagalur (Karnataka)",
-        "Mahabalipuram (Tamil Nadu)",
-        "Varanasi Ghats (Uttar Pradesh)",
-        "Sanchi Stupa (Madhya Pradesh)",
-        "Lonavala (Maharashtra)",
-        "Mount Abu (Rajasthan)",
-        "Puri Jagannath Temple (Odisha)",
-        "Kaziranga National Park (Assam)",
-        "Jim Corbett Park (Uttarakhand)",
-        "Valley of Flowers (Uttarakhand)",
-        "Gulmarg (Jammu & Kashmir)",
-        "Kovalam Beach (Kerala)",
-        "Varkala Beach (Kerala)",
-        "Hampi Ruins (Karnataka)",
-        "Amarnath Cave (J&K)",
-        "Dwarkadhish Temple (Gujarat)",
-        "Somnath Temple (Gujarat)",
-        "Pangong Lake (Ladakh)",
-        "Auroville (Pondicherry)",
-        "Thanjavur Temple (Tamil Nadu)",
-        "Rishikesh (Uttarakhand)",
-        "Haridwar (Uttarakhand)",
-        "Bandhavgarh National Park (Madhya Pradesh)",
-        "Kanha National Park (Madhya Pradesh)",
-        "Hogenakkal Falls (Tamil Nadu)",
-        "Athirapally Falls (Kerala)",
-        "Belur & Halebidu (Karnataka)",
-        "Chennai Marina Beach (Tamil Nadu)",
-        "Bangalore Lalbagh Garden (Karnataka)",
-        "Gangaikonda Cholapuram (Tamil Nadu)",
-        "Mahabaleshwar (Maharashtra)",
-        "Pondicherry Promenade (Puducherry)",
-        "Agumbe (Karnataka)",
-        "Tawang Monastery (Arunachal Pradesh)",
-        "Ziro Valley (Arunachal Pradesh)",
-        "Spiti Valley (Himachal Pradesh)",
-        "Nainital (Uttarakhand)",
-        "Ranthambore National Park (Rajasthan)",
-        "Udaipur Lake Palace (Rajasthan)",
-        "Pushkar (Rajasthan)",
-        "Jaisalmer Fort (Rajasthan)",
-        "Amer Fort (Jaipur)",
-        "Gokarna Beach (Karnataka)",
-        "Alleppey (Kerala)",
-        "Cherrapunji (Meghalaya)",
-        "Shillong (Meghalaya)",
-        "Sikkim (Gangtok)",
-        "Madurai (Tamil Nadu)",
-        "Vijayawada Kanaka Durga Temple (Andhra Pradesh)",
-        "Visakhapatnam Beaches (Andhra Pradesh)",
-        "Bhubaneswar Temples (Odisha)",
-        "Patna Sahib (Bihar)",
-        "Nalanda Ruins (Bihar)",
-        "Diu Fort (Diu)",
-        "Daman Beach (Daman)",
-        "Ranakpur Temple (Rajasthan)",
-        "Murudeshwar Temple (Karnataka)",
-        "Sringeri Temple (Karnataka)",
-        "Pachmarhi (Madhya Pradesh)",
-        "Gir National Park (Gujarat)",
-        "Ravangla (Sikkim)",
-        "Aizawl (Mizoram)",
-        "Imphal (Manipur)",
-        "Majuli Island (Assam)",
-        "Loktak Lake (Manipur)",
-        "Lakshadweep Islands",
-    ].map((place) => ({ label: place, value: place }));
+    // 🔍 Fetch from Nominatim
+    const fetchPlaces = async (query) => {
+        if (query.length < 3) return;
+
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${query}&format=json&addressdetails=1&limit=5`,
+                {
+                    headers: {
+                        "User-Agent": "tourist-app (subhashini10.3.2005@gmail.com)",
+                    },
+                }
+            );
+
+            const data = await response.json();
+
+            const formatted = data.map((place) => ({
+                label: place.display_name,
+                value: place.display_name,
+                lat: place.lat,
+                lon: place.lon,
+            }));
+
+            setOptions(formatted);
+        } catch (error) {
+            console.error("Error fetching places:", error);
+        }
+    };
+
+
+    useEffect(() => {
+        const delay = setTimeout(() => {
+            fetchPlaces(inputValue);
+        }, 500); // 500ms delay
+
+        return () => clearTimeout(delay);
+    }, [inputValue]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
         if (!selectedPlace) {
             alert("Please select a tourist place!");
             return;
         }
 
         localStorage.setItem("selectedPlace", selectedPlace.value);
-        navigate("/verify2"); // Redirect to VerificationPage2
+        localStorage.setItem("selectedLat", selectedPlace.lat);
+        localStorage.setItem("selectedLon", selectedPlace.lon);
+        navigate("/verify2");
     };
 
     return (
         <div className="card">
-            <h2>Select Tourist Place 🏞️</h2>
+            <h2>Select Tourist Place </h2>
 
             <form onSubmit={handleSubmit}>
                 <Select
-                    options={touristPlaces}
+                    options={options}
                     value={selectedPlace}
                     onChange={setSelectedPlace}
-                    placeholder="Search or select a tourist place..."
+                    onInputChange={(value) => setInputValue(value)}
+                    placeholder="Start typing a place..."
                     isSearchable
-                    styles={{
-                        control: (base) => ({
-                            ...base,
-                            backgroundColor: "white",
-                            borderRadius: "8px",
-                            marginBottom: "15px",
-                        }),
-                    }}
+                    noOptionsMessage={() => "Type at least 3 letters"}
                 />
 
                 <button type="submit" className="btn btn-primary">

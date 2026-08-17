@@ -43,7 +43,7 @@ function Verificationpage() {
 
     return (
         <div className="card">
-            <h2>Email Verification 📧</h2>
+            <h2>Email Verification </h2>
             <p>Email: {email}</p>
             <button onClick={handleSendToken} className="btn btn-secondary">
                 Send Verification Token

@@ -37,7 +37,7 @@ function Registrationpage() {
 
     return (
         <div className="card">
-            <h2>Register 📝</h2>
+            <h2>Register </h2>
             <form onSubmit={handleRegister}>
                 <input
                     type="text"
