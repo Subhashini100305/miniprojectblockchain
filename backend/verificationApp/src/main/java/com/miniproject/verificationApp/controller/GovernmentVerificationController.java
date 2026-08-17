@@ -1,12 +1,22 @@
 package com.miniproject.verificationApp.controller;
 
+import com.miniproject.verificationApp.dto.VerificationResponseDTO;
+import com.miniproject.verificationApp.dto.VerificationStatusDTO;
+
 import com.miniproject.verificationApp.model.GovernmentIdVerification;
 import com.miniproject.verificationApp.model.User;
 import com.miniproject.verificationApp.repository.GovernmentIdVerificationRepository;
 import com.miniproject.verificationApp.repository.UserRepository;
-import com.miniproject.verificationApp.service.OCRService;
+import com.miniproject.verificationApp.service.AIVerificationService;
+import com.miniproject.verificationApp.service.AIVerificationResult;
+import com.miniproject.verificationApp.service.ExifGpsService;
+import com.miniproject.verificationApp.service.JwtService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,6 +30,11 @@ import java.util.*;
 @CrossOrigin(origins = "http://localhost:3000")
 public class GovernmentVerificationController {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(
+                    GovernmentVerificationController.class
+            );
+
     @Autowired
     private GovernmentIdVerificationRepository verificationRepository;
 
@@ -27,106 +42,348 @@ public class GovernmentVerificationController {
     private UserRepository userRepository;
 
     @Autowired
-    private OCRService ocrService;
+    private AIVerificationService aiVerificationService;
 
-    private static final String UPLOAD_DIR = "C:/uploads/";
+    @Autowired
+    private ExifGpsService exifGpsService;
 
-    // ✅ Upload and verify proof using OCR
+    @Autowired
+    private JwtService jwtService;
+
+    @Value("${app.upload.dir:C:/uploads/}")
+    private String uploadDir;
+
     @PostMapping("/upload")
-    public String uploadProof(
-            @RequestParam("email") String email,
+    public ResponseEntity<VerificationResponseDTO> uploadProof(
+            @RequestHeader("Authorization") String authHeader,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("selectedPlace") String selectedPlace
+            @RequestParam("selectedPlace") String selectedPlace,
+            @RequestParam("selectedLat") double selectedLat,
+            @RequestParam("selectedLon") double selectedLon
     ) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
+
+        String email =
+                jwtService.extractEmail(
+                        authHeader.substring(7)
+                );
+
+        Optional<User> userOpt =
+                userRepository.findByEmail(email);
+
         if (userOpt.isEmpty()) {
-            return "User not found!";
+            throw new RuntimeException("User not found");
         }
 
         User user = userOpt.get();
 
         try {
-            File dir = new File(UPLOAD_DIR);
-            if (!dir.exists()) dir.mkdirs();
 
-            // Save uploaded file
-            String filePath = UPLOAD_DIR + System.currentTimeMillis() + "_" + file.getOriginalFilename();
-            File uploadedFile = new File(filePath);
-            file.transferTo(uploadedFile);
+            // =================================================
+            // SAVE UPLOADED FILE
+            // =================================================
 
-            // 🧠 Extract text using OCR
-            String extractedText = ocrService.extractText(uploadedFile);
-            System.out.println("Extracted text: " + extractedText);
-            System.out.println("Selected place: " + selectedPlace);
+            File dir = new File(uploadDir);
 
-            GovernmentIdVerification verification = new GovernmentIdVerification();
-            verification.setUser(user);
-            verification.setProofUrl(filePath);
-            verification.setPlaceName(selectedPlace);
-            verification.setCreatedAt(LocalDateTime.now());
+            if (!dir.exists() && !dir.mkdirs()) {
 
-            if (extractedText != null && !extractedText.isEmpty()) {
-                String normalizedText = extractedText.toLowerCase().replaceAll("[^a-z]", "");
-                String normalizedPlace = selectedPlace.toLowerCase().replaceAll("[^a-z]", "");
-
-                String[] placeParts = selectedPlace
-                        .replaceAll("[^a-zA-Z ]", " ")
-                        .toLowerCase()
-                        .split("\\s+");
-
-                boolean matchFound = false;
-                for (String part : placeParts) {
-                    if (part.length() < 3) continue;
-                    if (normalizedText.contains(part) || extractedText.toLowerCase().contains(part)) {
-                        matchFound = true;
-                        break;
-                    }
-                }
-
-                if (matchFound) {
-                    verification.setStatus(GovernmentIdVerification.Status.VERIFIED);
-                    verification.setVerifiedOn(LocalDateTime.now());
-                    user.setGovernmentIdVerified(true);
-                    userRepository.save(user);
-                    verificationRepository.save(verification);
-                    return "VERIFIED:" + selectedPlace;
-                } else {
-                    verification.setStatus(GovernmentIdVerification.Status.REJECTED);
-                    verificationRepository.save(verification);
-                    return "REJECTED:" + selectedPlace;
-                }
-            } else {
-                verification.setStatus(GovernmentIdVerification.Status.REJECTED);
-                verificationRepository.save(verification);
-                return "NO_TEXT:" + selectedPlace;
+                throw new IOException(
+                        "Unable to create upload directory: "
+                                + dir.getAbsolutePath()
+                );
             }
 
+            String fileName =
+                    UUID.randomUUID().toString();
+
+            String filePath =
+                    new File(
+                            dir,
+                            fileName
+                    ).getAbsolutePath();
+
+            File uploadedFile =
+                    new File(filePath);
+
+            file.transferTo(uploadedFile);
+
+            // =================================================
+            // GPS VERIFICATION
+            // =================================================
+
+            double[] gpsCoordinates =
+                    exifGpsService.extractGpsCoordinates(
+                            uploadedFile
+                    );
+
+            boolean gpsVerified = false;
+
+            double distanceMeters = -1;
+
+            Double photoLat = null;
+            Double photoLon = null;
+
+            String gpsReason = "";
+
+            if (gpsCoordinates != null) {
+
+                photoLat =
+                        gpsCoordinates[0];
+
+                photoLon =
+                        gpsCoordinates[1];
+
+                distanceMeters =
+                        exifGpsService.calculateDistanceMeters(
+                                photoLat,
+                                photoLon,
+                                selectedLat,
+                                selectedLon
+                        );
+
+                gpsVerified =
+                        distanceMeters <= 500;
+
+                if (!gpsVerified) {
+
+                    gpsReason =
+                            "Photo GPS does not match selected location";
+                }
+
+            } else {
+
+                gpsReason =
+                        "No GPS metadata found";
+            }
+
+            // =================================================
+            // AI VERIFICATION
+            //
+            // AIVerificationService internally decides:
+            //
+            // Google Vision first
+            //       ↓
+            // Google works → Google result
+            //       ↓
+            // Google technical failure
+            //       ↓
+            // Azure Vision
+            // =================================================
+
+            AIVerificationResult aiResult =
+                    aiVerificationService.verifyProof(
+                            uploadedFile,
+                            selectedPlace
+                    );
+
+            logger.info(
+                    "AI provider used={}",
+                    aiResult.getAiProvider()
+            );
+
+            // =================================================
+            // CREATE VERIFICATION RECORD
+            // =================================================
+
+            GovernmentIdVerification verification =
+                    new GovernmentIdVerification();
+
+            verification.setUser(user);
+
+            verification.setProofUrl(filePath);
+
+            verification.setPlaceName(
+                    selectedPlace
+            );
+
+            verification.setCreatedAt(
+                    LocalDateTime.now()
+            );
+
+            verification.setPhotoLatitude(
+                    photoLat
+            );
+
+            verification.setPhotoLongitude(
+                    photoLon
+            );
+
+            verification.setGpsVerified(
+                    gpsVerified
+            );
+
+            verification.setDistanceMeters(
+                    distanceMeters
+            );
+
+            verification.setAiConfidenceScore(
+                    (double)
+                            aiResult.getConfidenceScore()
+            );
+
+            // =================================================
+            // VERIFIED
+            // =================================================
+
+            if (aiResult.isVerified()
+                    && (gpsVerified
+                    || gpsCoordinates == null)) {
+
+                verification.setStatus(
+                        GovernmentIdVerification.Status.VERIFIED
+                );
+
+                verification.setVerifiedOn(
+                        LocalDateTime.now()
+                );
+
+                user.setGovernmentIdVerified(
+                        true
+                );
+
+                userRepository.save(user);
+
+                verificationRepository.save(
+                        verification
+                );
+
+                logger.info(
+                        "Verification completed status=VERIFIED provider={} verificationType={}",
+                        aiResult.getAiProvider(),
+                        aiResult.getVerificationType()
+                );
+
+                VerificationResponseDTO response =
+                        new VerificationResponseDTO(
+                                "VERIFIED",
+                                selectedPlace,
+                                (double)
+                                        aiResult
+                                                .getConfidenceScore(),
+                                aiResult
+                                        .getVerificationType(),
+                                aiResult
+                                        .getAiProvider(),
+                                gpsVerified,
+                                distanceMeters,
+                                null,
+                                gpsReason
+                        );
+
+                return ResponseEntity.ok(
+                        response
+                );
+            }
+
+            // =================================================
+            // REJECTED
+            // =================================================
+
+            verification.setStatus(
+                    GovernmentIdVerification.Status.REJECTED
+            );
+
+            verificationRepository.save(
+                    verification
+            );
+
+            String reason;
+
+            if (!aiResult.isVerified()) {
+
+                reason =
+                        "AI could not verify this image. "
+                                + aiResult.getMessage();
+
+            } else if (
+                    gpsCoordinates != null
+                            && !gpsVerified
+            ) {
+
+                reason =
+                        "GPS mismatch. Photo was taken "
+                                + String.format(
+                                "%.2f",
+                                distanceMeters
+                        )
+                                + " meters away from selected place.";
+
+            } else {
+
+                reason =
+                        "Verification failed";
+            }
+
+            logger.info(
+                    "Verification completed status=REJECTED provider={} verificationType={}",
+                    aiResult.getAiProvider(),
+                    aiResult.getVerificationType()
+            );
+
+            VerificationResponseDTO response =
+                    new VerificationResponseDTO(
+                            "REJECTED",
+                            selectedPlace,
+                            (double)
+                                    aiResult
+                                            .getConfidenceScore(),
+                            aiResult
+                                    .getVerificationType(),
+                            aiResult
+                                    .getAiProvider(),
+                            gpsVerified,
+                            distanceMeters,
+                            reason,
+                            gpsReason
+                    );
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(response);
+
         } catch (IOException e) {
-            e.printStackTrace();
-            return "ERROR:" + e.getMessage();
+
+            logger.error(
+                    "Verification upload failed exceptionType={}",
+                    e.getClass().getName()
+            );
+
+            throw new IllegalStateException(
+                    "Verification upload failed"
+            );
         }
     }
 
-    // ✅ Get all verifications for a user
+    // =========================================================
+    // GET VERIFICATION STATUS
+    // =========================================================
+
     @GetMapping("/status")
-    public List<Map<String, Object>> getUserVerifications(@RequestParam("email") String email) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
+    public List<VerificationStatusDTO> getVerificationStatus(
+            @RequestHeader("Authorization") String authHeader
+    ) {
+
+        String email =
+                jwtService.extractEmail(
+                        authHeader.substring(7)
+                );
+
+        Optional<User> userOpt =
+                userRepository.findByEmail(email);
+
         if (userOpt.isEmpty()) {
-            return List.of();
+
+            return new ArrayList<>();
         }
 
-        User user = userOpt.get();
-        List<GovernmentIdVerification> list = verificationRepository.findByUserId(user.getId());
+        User user =
+                userOpt.get();
 
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (GovernmentIdVerification v : list) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("status", v.getStatus().toString());
-            map.put("proofUrl", v.getProofUrl());
-            map.put("verifiedOn", v.getVerifiedOn());
-            map.put("placeName", v.getPlaceName());
-            result.add(map);
-        }
-        return result;
+        return verificationRepository
+                .findByUserIdOrderByCreatedAtDesc(
+                        user.getId()
+                )
+                .stream()
+                .map(VerificationStatusDTO::new)
+                .toList();
     }
 }

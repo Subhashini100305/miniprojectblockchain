@@ -1,5 +1,6 @@
 package com.miniproject.verificationApp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -20,8 +21,12 @@ public class GovernmentIdVerification {
     @Column(nullable = false)
     private Status status = Status.PENDING;
 
+    @JsonIgnore
     @Column(name = "proof_url", length = 1024)
     private String proofUrl;
+
+    @Column(name = "ai_confidence_score")
+    private Double aiConfidenceScore;
 
     @Column(name = "verified_on")
     private LocalDateTime verifiedOn;
@@ -29,15 +34,27 @@ public class GovernmentIdVerification {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // 🆕 New field for place name
     @Column(name = "place_name")
     private String placeName;
+
+    @JsonIgnore
+    @Column(name = "photo_latitude")
+    private Double photoLatitude;
+
+    @JsonIgnore
+    @Column(name = "photo_longitude")
+    private Double photoLongitude;
+
+    @Column(name = "gps_verified")
+    private Boolean gpsVerified = false;
+
+    @Column(name = "distance_meters")
+    private Double distanceMeters;
 
     public enum Status {
         PENDING, VERIFIED, REJECTED
     }
 
-    // Getters & Setters
     public Long getId() {
         return id;
     }
@@ -52,6 +69,14 @@ public class GovernmentIdVerification {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Double getAiConfidenceScore() {
+        return aiConfidenceScore;
+    }
+
+    public void setAiConfidenceScore(Double aiConfidenceScore) {
+        this.aiConfidenceScore = aiConfidenceScore;
     }
 
     public Status getStatus() {
@@ -92,5 +117,37 @@ public class GovernmentIdVerification {
 
     public void setPlaceName(String placeName) {
         this.placeName = placeName;
+    }
+
+    public Double getPhotoLatitude() {
+        return photoLatitude;
+    }
+
+    public void setPhotoLatitude(Double photoLatitude) {
+        this.photoLatitude = photoLatitude;
+    }
+
+    public Double getPhotoLongitude() {
+        return photoLongitude;
+    }
+
+    public void setPhotoLongitude(Double photoLongitude) {
+        this.photoLongitude = photoLongitude;
+    }
+
+    public Boolean getGpsVerified() {
+        return gpsVerified;
+    }
+
+    public void setGpsVerified(Boolean gpsVerified) {
+        this.gpsVerified = gpsVerified;
+    }
+
+    public Double getDistanceMeters() {
+        return distanceMeters;
+    }
+
+    public void setDistanceMeters(Double distanceMeters) {
+        this.distanceMeters = distanceMeters;
     }
 }
