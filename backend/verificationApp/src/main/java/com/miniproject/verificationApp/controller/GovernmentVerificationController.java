@@ -77,11 +77,6 @@ public class GovernmentVerificationController {
         User user = userOpt.get();
 
         try {
-
-            // =================================================
-            // SAVE UPLOADED FILE
-            // =================================================
-
             File dir = new File(uploadDir);
 
             if (!dir.exists() && !dir.mkdirs()) {
@@ -105,11 +100,6 @@ public class GovernmentVerificationController {
                     new File(filePath);
 
             file.transferTo(uploadedFile);
-
-            // =================================================
-            // GPS VERIFICATION
-            // =================================================
-
             double[] gpsCoordinates =
                     exifGpsService.extractGpsCoordinates(
                             uploadedFile
@@ -155,20 +145,6 @@ public class GovernmentVerificationController {
                         "No GPS metadata found";
             }
 
-            // =================================================
-            // AI VERIFICATION
-            //
-            // AIVerificationService internally decides:
-            //
-            // Google Vision first
-            //       ↓
-            // Google works → Google result
-            //       ↓
-            // Google technical failure
-            //       ↓
-            // Azure Vision
-            // =================================================
-
             AIVerificationResult aiResult =
                     aiVerificationService.verifyProof(
                             uploadedFile,
@@ -179,11 +155,6 @@ public class GovernmentVerificationController {
                     "AI provider used={}",
                     aiResult.getAiProvider()
             );
-
-            // =================================================
-            // CREATE VERIFICATION RECORD
-            // =================================================
-
             GovernmentIdVerification verification =
                     new GovernmentIdVerification();
 
@@ -219,11 +190,6 @@ public class GovernmentVerificationController {
                     (double)
                             aiResult.getConfidenceScore()
             );
-
-            // =================================================
-            // VERIFIED
-            // =================================================
-
             if (aiResult.isVerified()
                     && (gpsVerified
                     || gpsCoordinates == null)) {
@@ -273,11 +239,6 @@ public class GovernmentVerificationController {
                         response
                 );
             }
-
-            // =================================================
-            // REJECTED
-            // =================================================
-
             verification.setStatus(
                     GovernmentIdVerification.Status.REJECTED
             );
@@ -352,11 +313,6 @@ public class GovernmentVerificationController {
             );
         }
     }
-
-    // =========================================================
-    // GET VERIFICATION STATUS
-    // =========================================================
-
     @GetMapping("/status")
     public List<VerificationStatusDTO> getVerificationStatus(
             @RequestHeader("Authorization") String authHeader
